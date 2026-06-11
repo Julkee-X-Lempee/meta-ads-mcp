@@ -1,5 +1,6 @@
 import { AdsConfig } from "../config.js";
 import { RateLimit, BusinessRateLimit } from "../types.js";
+import { requestStorage } from "../index.js";
 
 interface ClientResponse {
   data: unknown;
@@ -215,6 +216,15 @@ export class AdsClient {
   }
 
   get accountId(): string {
+    try {
+      const store = requestStorage.getStore();
+      const dynamicId = store?.get("adAccountId");
+      if (dynamicId) {
+        return dynamicId.replace(/^act_/, "");
+      }
+    } catch (e) {
+      // Ignore error if storage is accessed outside request context
+    }
     if (!this.config.adAccountId) {
       throw new Error(
         "META_AD_ACCOUNT_ID is not configured. Set it as an environment variable."
