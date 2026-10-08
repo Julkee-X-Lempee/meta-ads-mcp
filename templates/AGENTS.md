@@ -2,7 +2,7 @@
 
 This project uses **meta-ads-mcp** to manage Facebook & Instagram advertising via MCP tools.
 
-## Available Tools (135)
+## Available Tools (134)
 
 Use `mcp__meta-ads__<tool>` for all Meta advertising operations.
 

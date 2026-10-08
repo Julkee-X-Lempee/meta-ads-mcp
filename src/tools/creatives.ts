@@ -1,6 +1,21 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { AdsClient } from "../services/ads-client.js";
+import { parseJsonObject } from "../services/api-contracts.js";
+
+const creativeOptions = {
+  destination_spec: z.string().optional().describe("JSON object controlling the destination; set destination_type=WEBSITE_AND_SHOP_OPT_OUT to opt out of the v26 Shops default"),
+  wamo_whatsapp_identity_spec: z.string().optional().describe("JSON object with wamo_whatsapp_identity_id or whatsapp_phone_number for WhatsApp Status ads; sent at the creative's top level"),
+  degrees_of_freedom_spec: z.string().optional().describe("JSON object for Advantage+ creative controls, including creative_features_spec.image_animation, video_filtering, and video_uncrop"),
+};
+
+function buildCreativeOptions(options: Partial<Record<keyof typeof creativeOptions, string>>): Record<string, unknown> {
+  const params: Record<string, unknown> = {};
+  for (const [name, value] of Object.entries(options)) {
+    if (value !== undefined) params[name] = parseJsonObject(value, name);
+  }
+  return params;
+}
 
 export function registerCreativeTools(server: McpServer, client: AdsClient): void {
   // ─── list_creatives ────────────────────────────────────────
@@ -53,16 +68,26 @@ export function registerCreativeTools(server: McpServer, client: AdsClient): voi
     "Create a new ad creative with object_story_spec. The spec defines the ad content (link, photo, or video) and the associated Facebook Page. Notes for v26.0: poll_spec and the poll type under interactive_components_spec are no longer supported and will be rejected. If the advertiser has a shop, eligible creatives now default to destination_spec.destination_type=WEBSITE_AND_SHOP — set it to WEBSITE_AND_SHOP_OPT_OUT to opt out.",
     {
       name: z.string().describe("Creative name"),
-      object_story_spec: z.string().describe("JSON string of object_story_spec (page_id, link_data/photo_data/video_data). As of v26.0, it can also include wamo_whatsapp_identity_spec to deliver ads in WhatsApp Status (Offsite-conversion optimization is supported for Sales, Leads, Engagement, and Landing Page Views)."),
+      object_story_spec: z.string().describe("JSON string of object_story_spec (page_id, link_data/photo_data/video_data). Use the separate wamo_whatsapp_identity_spec parameter for WhatsApp Status ads."),
       url_tags: z.string().optional().describe("URL tags to append to all links"),
       asset_feed_spec: z.string().optional().describe("JSON string of asset_feed_spec for dynamic creative"),
+      ...creativeOptions,
       account_id: z.string().optional().describe("Ad account ID to create the creative in (e.g. 'act_123' or '123'). Falls back to META_AD_ACCOUNT_ID env var if omitted."),
     },
-    async ({ name, object_story_spec, url_tags, asset_feed_spec, account_id }) => {
+    async ({ name, object_story_spec, url_tags, asset_feed_spec, account_id, ...options }) => {
       try {
-        const params: Record<string, unknown> = { name, object_story_spec };
+        const story = parseJsonObject(object_story_spec, "object_story_spec");
+        const params: Record<string, unknown> = { name, object_story_spec: story, ...buildCreativeOptions(options) };
+        // Older descriptions placed WhatsApp identity inside object_story_spec.
+        if (story.wamo_whatsapp_identity_spec !== undefined) {
+          if (params.wamo_whatsapp_identity_spec !== undefined) throw new Error("Specify wamo_whatsapp_identity_spec only once, at the top level.");
+          const identity = story.wamo_whatsapp_identity_spec;
+          if (!identity || typeof identity !== "object" || Array.isArray(identity)) throw new Error("wamo_whatsapp_identity_spec must be an object.");
+          params.wamo_whatsapp_identity_spec = identity;
+          delete story.wamo_whatsapp_identity_spec;
+        }
         if (url_tags) params.url_tags = url_tags;
-        if (asset_feed_spec) params.asset_feed_spec = asset_feed_spec;
+        if (asset_feed_spec) params.asset_feed_spec = parseJsonObject(asset_feed_spec, "asset_feed_spec");
         const { data, rateLimit } = await client.post(`${client.accountPath(account_id)}/adcreatives`, params);
         return { content: [{ type: "text" as const, text: JSON.stringify({ ...data as object, _rateLimit: rateLimit }, null, 2) }] };
       } catch (error) {
@@ -100,11 +125,14 @@ export function registerCreativeTools(server: McpServer, client: AdsClient): voi
     {
       name: z.string().describe("Creative name"),
       asset_feed_spec: z.string().describe("JSON string of asset_feed_spec with arrays: images (hash), videos (video_id), bodies (text), titles (text), descriptions (text), call_to_action_types"),
+      object_story_spec: z.string().optional().describe("JSON object containing the associated page_id and optional instagram_user_id"),
+      ...creativeOptions,
       account_id: z.string().optional().describe("Ad account ID to create the creative in (e.g. 'act_123' or '123'). Falls back to META_AD_ACCOUNT_ID env var if omitted."),
     },
-    async ({ name, asset_feed_spec, account_id }) => {
+    async ({ name, asset_feed_spec, object_story_spec, account_id, ...options }) => {
       try {
-        const params: Record<string, unknown> = { name, asset_feed_spec };
+        const params: Record<string, unknown> = { name, asset_feed_spec: parseJsonObject(asset_feed_spec, "asset_feed_spec"), ...buildCreativeOptions(options) };
+        if (object_story_spec) params.object_story_spec = parseJsonObject(object_story_spec, "object_story_spec");
         const { data, rateLimit } = await client.post(`${client.accountPath(account_id)}/adcreatives`, params);
         return { content: [{ type: "text" as const, text: JSON.stringify({ ...data as object, _rateLimit: rateLimit }, null, 2) }] };
       } catch (error) {

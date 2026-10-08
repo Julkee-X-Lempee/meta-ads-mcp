@@ -3,7 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/@mikusnuz/meta-ads-mcp.svg)](https://www.npmjs.com/package/@mikusnuz/meta-ads-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-MCP server for the **Meta Marketing API v26.0** — 135 tools for managing Facebook & Instagram ad campaigns, audiences, creatives, insights, catalogs, and more.
+MCP server for the **Meta Marketing API v26.0** — 134 tools for managing Facebook & Instagram ad campaigns, audiences, creatives, insights, catalogs, and more.
 
 ## When to Use
 
@@ -19,6 +19,12 @@ Use this MCP when you need to:
 - **"Search the Facebook Ad Library for competitor ads"** — use `search_ad_library` to find public ad data
 - **"Set up automated rules to pause underperforming ads"** — use `create_rule` with conditions like CPA > threshold
 - **"Manage my product catalog for dynamic ads"** — use `create_catalog`, `create_feed`, and `upload_feed` to set up dynamic product ads
+
+## What's New in v1.5.0
+
+- Conversion tools validate the existing `events` JSON input and send it as the required `data` array. Use `test_event_code` to verify receipt in Events Manager; offline events use a dataset ID and `action_source=physical_store` for store events.
+- Creative creation accepts top-level `destination_spec`, `wamo_whatsapp_identity_spec`, and `degrees_of_freedom_spec` JSON objects. Dynamic creatives also accept `object_story_spec` for Page identity. To opt out of the v26 Shops destination default, set `destination_spec` to `{"destination_type":"WEBSITE_AND_SHOP_OPT_OUT"}`.
+- Includes complete async-report result retrieval, token extension, and budget schedule fixes since v1.4.1. Some detailed Insights breakdowns require an Ads Manager opt-in; an empty response does not necessarily mean zero performance.
 
 ## Installation
 
@@ -52,7 +58,7 @@ Use this MCP when you need to:
 | `META_BUSINESS_ID` | Optional | Business Manager ID — required for business tools |
 | `META_PIXEL_ID` | Optional | Pixel ID — required for conversion tools |
 
-## Tools (135)
+## Tools (134)
 
 ### Campaign Management (25)
 

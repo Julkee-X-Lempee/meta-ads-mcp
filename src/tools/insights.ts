@@ -8,7 +8,7 @@ import {
 
 const insightParams = {
   fields: z.string().optional().default("impressions,clicks,spend,reach,frequency,cpc,cpm,ctr,actions,cost_per_action_type").describe("Comma-separated insight fields"),
-  breakdowns: z.string().optional().describe("Breakdown dimensions: age,gender,country,region,placement,device_platform"),
+  breakdowns: z.string().optional().describe("Breakdown dimensions: age,gender,country,region,publisher_platform,platform_position,device_platform,comscore_market (replaces dma). Some accounts must opt in in Ads Manager for impression_device, hourly_stats_aggregated_by_audience_time_zone, and frequency_value; empty results do not necessarily mean zero performance."),
   date_preset: z.string().optional().describe("Lowercase date preset, for example: today, yesterday, last_7d, last_14d, last_30d, this_month, last_month, this_quarter, last_quarter, this_year, last_year"),
   time_range: z.string().optional().describe("JSON string {since,until} in YYYY-MM-DD format"),
   time_increment: z.string().optional().describe("Time granularity: all_days, 1, 7, monthly"),

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { AdsClient } from "../services/ads-client.js";
+import { buildConversionParams } from "../services/api-contracts.js";
 
 export function registerConversionTools(server: McpServer, client: AdsClient): void {
   // ─── send_conversion_event ─────────────────────────────────
@@ -9,10 +10,12 @@ export function registerConversionTools(server: McpServer, client: AdsClient): v
     "Send a server-side conversion event via the Conversions API (pixel).",
     {
       events: z.string().describe("JSON array of events: [{event_name, event_time, user_data, custom_data, action_source}]"),
+      test_event_code: z.string().optional().describe("Events Manager test code; use to verify delivery as test events"),
     },
-    async (params) => {
+    async ({ events, test_event_code }) => {
       try {
-        const { data, rateLimit } = await client.post(`/${client.pixelId}/events`, { ...params });
+        const params = buildConversionParams(events, test_event_code);
+        const { data, rateLimit } = await client.post(`/${client.pixelId}/events`, params);
         return { content: [{ type: "text" as const, text: JSON.stringify({ ...data as object, _rateLimit: rateLimit }, null, 2) }] };
       } catch (error) {
         return { content: [{ type: "text" as const, text: `Failed: ${error instanceof Error ? error.message : String(error)}` }], isError: true };
@@ -23,14 +26,16 @@ export function registerConversionTools(server: McpServer, client: AdsClient): v
   // ─── send_offline_event ────────────────────────────────────
   server.tool(
     "send_offline_event",
-    "Send an offline conversion event to an offline event set.",
+    "Send offline conversion events through the Conversions API to a dataset. Store events must use action_source=physical_store.",
     {
-      event_set_id: z.string().describe("Offline event set ID"),
+      event_set_id: z.string().describe("Dataset ID for offline events (legacy parameter name retained)"),
       events: z.string().describe("JSON array of offline events"),
+      test_event_code: z.string().optional().describe("Events Manager test code; use to verify delivery as test events"),
     },
-    async ({ event_set_id, ...params }) => {
+    async ({ event_set_id, events, test_event_code }) => {
       try {
-        const { data, rateLimit } = await client.post(`/${event_set_id}/events`, { ...params });
+        const params = buildConversionParams(events, test_event_code);
+        const { data, rateLimit } = await client.post(`/${event_set_id}/events`, params);
         return { content: [{ type: "text" as const, text: JSON.stringify({ ...data as object, _rateLimit: rateLimit }, null, 2) }] };
       } catch (error) {
         return { content: [{ type: "text" as const, text: `Failed: ${error instanceof Error ? error.message : String(error)}` }], isError: true };

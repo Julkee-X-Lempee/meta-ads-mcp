@@ -3,7 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/@mikusnuz/meta-ads-mcp.svg)](https://www.npmjs.com/package/@mikusnuz/meta-ads-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**Meta Marketing API v26.0** MCP 서버 — Facebook & Instagram 광고 캠페인 관리를 위한 135개 도구를 제공합니다.
+**Meta Marketing API v26.0** MCP 서버 — Facebook & Instagram 광고 캠페인 관리를 위한 134개 도구를 제공합니다.
 
 ## 이런 경우에 사용하세요
 
@@ -17,6 +17,12 @@
 - **"경쟁사 광고 찾아줘"** — `search_ad_library`로 공개 광고 데이터 검색
 - **"성과 나쁜 광고 자동 중지 규칙 만들어줘"** — `create_rule`로 CPA > 임계값 등 조건 설정
 - **"다이나믹 광고용 상품 카탈로그 관리해줘"** — `create_catalog`, `create_feed`, `upload_feed`로 동적 상품 광고 설정
+
+## v1.5.0 변경사항
+
+- 전환 도구는 기존 `events` JSON 입력을 검증하고 공식 `data` 배열로 전송합니다. `test_event_code`로 이벤트 관리자에서 수신을 검증할 수 있습니다. 오프라인 이벤트는 데이터셋 ID를 사용하며 매장 이벤트의 `action_source`는 `physical_store`입니다.
+- 크리에이티브 생성에 최상위 JSON 옵션 `destination_spec`, `wamo_whatsapp_identity_spec`, `degrees_of_freedom_spec`를 지원합니다. 동적 크리에이티브도 페이지 식별용 `object_story_spec`를 지원합니다. v26의 Shops 기본 연결을 끄려면 `destination_spec`에 `{"destination_type":"WEBSITE_AND_SHOP_OPT_OUT"}`을 지정합니다.
+- v1.4.1 이후 비동기 리포트 결과 조회, 토큰 갱신, 예산 일정 수정을 포함합니다. 일부 상세 인사이트 분류는 광고 관리자에서 사용 신청이 필요하므로 빈 결과가 반드시 성과 0을 뜻하지는 않습니다.
 
 ## 설치
 
@@ -50,7 +56,7 @@
 | `META_BUSINESS_ID` | 선택 | 비즈니스 매니저 ID — 비즈니스 도구에 필요 |
 | `META_PIXEL_ID` | 선택 | 픽셀 ID — 전환 도구에 필요 |
 
-## 도구 (135개)
+## 도구 (134개)
 
 ### 캠페인 관리 (25)
 
