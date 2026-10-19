@@ -18,6 +18,14 @@
 - **"성과 나쁜 광고 자동 중지 규칙 만들어줘"** — `create_rule`로 CPA > 임계값 등 조건 설정
 - **"다이나믹 광고용 상품 카탈로그 관리해줘"** — `create_catalog`, `create_feed`, `upload_feed`로 동적 상품 광고 설정
 
+## v1.6.0 변경사항
+
+- `create_adset`에 `bid_amount`를 추가했습니다. 생성·수정 시 EU 광고용 `dsa_beneficiary`, `dsa_payor`를 각각 지정할 수 있습니다. 생략한 값은 해당 계정 기본값이 있어야 하며, 지급자가 수혜자 값으로 자동 복사되지는 않습니다.
+- 캠페인·광고 세트로 범위를 지정한 목록 조회는 해당 객체의 공식 하위 경로를 사용합니다. 함께 지정한 캠페인·광고 세트·계정이 일치하는지도 확인합니다.
+- 광고 세트 생성·수정에 `destination_type`, `attribution_spec`, `adset_schedule`, `pacing_type`, `validate_only`를 추가했습니다. 기존 호출의 쓰기 동작은 유지되며, 변경 없이 Meta 검증만 하려면 `validate_only: true`를 지정합니다. 검증 성공은 생성 완료가 아닙니다.
+- 시간대별 일정은 분 단위 구간과 요일(일요일=0)을 받습니다. `timezone_type`은 `USER` 또는 `ADVERTISER`로 명시하고, 일정에는 `day_parting` pacing이 추가됩니다. 유효한 총예산·목표·기여 설정 조건은 Meta가 검증하며 예산이나 상태를 자동 변경하지 않습니다.
+- `create_custom_audience`에 규칙 JSON인 `rule`, `pixel_id`, `retention_days`를 추가했습니다. 대상 생성은 실제 쓰기이며 dry-run은 지원하지 않습니다.
+
 ## v1.5.0 변경사항
 
 - 전환 도구는 기존 `events` JSON 입력을 검증하고 공식 `data` 배열로 전송합니다. `test_event_code`로 이벤트 관리자에서 수신을 검증할 수 있습니다. 오프라인 이벤트는 데이터셋 ID를 사용하며 매장 이벤트의 `action_source`는 `physical_store`입니다.

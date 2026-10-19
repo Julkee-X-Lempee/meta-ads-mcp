@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { AdsClient } from "../services/ads-client.js";
+import { scopedListPath } from "../services/adset-options.js";
 
 export function registerAdTools(server: McpServer, client: AdsClient): void {
   // ─── list_ads ──────────────────────────────────────────────
@@ -22,10 +23,9 @@ export function registerAdTools(server: McpServer, client: AdsClient): void {
         if (fields) params.fields = fields;
         if (limit) params.limit = limit;
         if (after) params.after = after;
-        if (campaign_id) params.campaign_id = campaign_id;
-        if (adset_id) params.adset_id = adset_id;
         if (status) params.effective_status = `["${status}"]`;
-        const { data, rateLimit } = await client.get(`${client.accountPath(account_id)}/ads`, params);
+        const path = await scopedListPath(client, "ads", campaign_id, adset_id, account_id);
+        const { data, rateLimit } = await client.get(path, params);
         return { content: [{ type: "text" as const, text: JSON.stringify({ ...data as object, _rateLimit: rateLimit }, null, 2) }] };
       } catch (error) {
         return { content: [{ type: "text" as const, text: `Failed: ${error instanceof Error ? error.message : String(error)}` }], isError: true };

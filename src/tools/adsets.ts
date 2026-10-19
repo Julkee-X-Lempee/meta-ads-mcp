@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { AdsClient } from "../services/ads-client.js";
+import { buildDeliveryOptions, deliveryOptions, scopedListPath } from "../services/adset-options.js";
+import { parseJsonObject } from "../services/api-contracts.js";
 
 export function registerAdsetTools(server: McpServer, client: AdsClient): void {
   // ─── list_adsets ───────────────────────────────────────────
@@ -21,9 +23,9 @@ export function registerAdsetTools(server: McpServer, client: AdsClient): void {
         if (fields) params.fields = fields;
         if (limit) params.limit = limit;
         if (after) params.after = after;
-        if (campaign_id) params.campaign_id = campaign_id;
         if (status) params.effective_status = `["${status}"]`;
-        const { data, rateLimit } = await client.get(`${client.accountPath(account_id)}/adsets`, params);
+        const path = await scopedListPath(client, "adsets", campaign_id, undefined, account_id);
+        const { data, rateLimit } = await client.get(path, params);
         return { content: [{ type: "text" as const, text: JSON.stringify({ ...data as object, _rateLimit: rateLimit }, null, 2) }] };
       } catch (error) {
         return { content: [{ type: "text" as const, text: `Failed: ${error instanceof Error ? error.message : String(error)}` }], isError: true };
@@ -63,6 +65,10 @@ export function registerAdsetTools(server: McpServer, client: AdsClient): void {
       optimization_goal: z.string().describe("Optimization goal: NONE, APP_INSTALLS, AD_RECALL_LIFT, ENGAGED_USERS, EVENT_RESPONSES, IMPRESSIONS, LEAD_GENERATION, QUALITY_LEAD, LINK_CLICKS, OFFSITE_CONVERSIONS, PAGE_LIKES, POST_ENGAGEMENT, QUALITY_CALL, REACH, LANDING_PAGE_VIEWS, VISIT_INSTAGRAM_PROFILE, ENGAGED_PAGE_VIEWS, VALUE, THRUPLAY, DERIVED_EVENTS, APP_INSTALLS_AND_OFFSITE_CONVERSIONS, CONVERSATIONS, IN_APP_VALUE, MESSAGING_PURCHASE_CONVERSION, MESSAGING_DEEP_CONVERSATION_AND_FOLLOW, SUBSCRIBERS, REMINDERS_SET, MEANINGFUL_CALL_ATTEMPT, PROFILE_VISIT, PROFILE_AND_PAGE_ENGAGEMENT, ADVERTISER_SILOED_VALUE, AUTOMATIC_OBJECTIVE, MESSAGING_APPOINTMENT_CONVERSION"),
       billing_event: z.string().describe("Billing event: APP_INSTALLS, CLICKS, IMPRESSIONS, LINK_CLICKS, NONE, OFFER_CLAIMS, PAGE_LIKES, POST_ENGAGEMENT, THRUPLAY, PURCHASE, LISTING_INTERACTION"),
       bid_strategy: z.string().optional().describe("Bid strategy: LOWEST_COST_WITHOUT_CAP, LOWEST_COST_WITH_BID_CAP, COST_CAP, LOWEST_COST_WITH_MIN_ROAS"),
+      bid_amount: z.string().regex(/^\d+$/).optional().describe("Bid amount in the account currency's minor unit. Required for COST_CAP or LOWEST_COST_WITH_BID_CAP except Reach and Frequency."),
+      dsa_beneficiary: z.string().min(1).optional().describe("Beneficiary of EU-targeted ads; may use the account's saved default when omitted"),
+      dsa_payor: z.string().min(1).optional().describe("Payer of EU-targeted ads; does not automatically copy dsa_beneficiary. May use the account's saved default."),
+      ...deliveryOptions,
       targeting: z.string().describe("JSON string of targeting spec (age_min, age_max, genders, geo_locations, interests, etc.). Advantage+ Audience automation and other flags go inside this object too, e.g. targeting_automation: {\"advantage_audience\":1}. As of v26.0, ad sets in the Housing, Employment, or Financial Products and Services (HEC-F) special ad categories with relaxable (non-broad) targeting must explicitly set targeting.targeting_automation.advantage_audience to 1 or 0 — omitting it now returns ADS_TARGETING__REQUIRE_EXPLICIT_ADVANTAGE_AUDIENCE_FLAG. Not required for broad/default audience setups. Also note: as of Marketing API v26.0, the Instagram Explore Feed placement was removed (explicitly specifying it in publisher_platforms/instagram_positions now returns an error) and the 'story' value in messenger_positions is silently dropped."),
       promoted_object: z.string().optional().describe("JSON string of the promoted_object spec. Required for many objectives, e.g. OUTCOME_SALES needs {\"pixel_id\":\"...\",\"custom_event_type\":\"PURCHASE\"}, OUTCOME_APP_PROMOTION needs {\"application_id\":\"...\",\"object_store_url\":\"...\"}, OUTCOME_ENGAGEMENT page-like ads need {\"page_id\":\"...\"}. Omitting it when the objective requires one causes ad set creation to fail."),
       start_time: z.string().optional().describe("Start time (ISO 8601)"),
@@ -70,24 +76,28 @@ export function registerAdsetTools(server: McpServer, client: AdsClient): void {
       status: z.string().optional().default("PAUSED").describe("Ad set status (default PAUSED)"),
       account_id: z.string().optional().describe("Ad account ID to create the ad set in (e.g. 'act_123' or '123'). Falls back to META_AD_ACCOUNT_ID env var if omitted."),
     },
-    async ({ name, campaign_id, daily_budget, lifetime_budget, optimization_goal, billing_event, bid_strategy, targeting, promoted_object, start_time, end_time, status, account_id }) => {
+    async ({ name, campaign_id, daily_budget, lifetime_budget, optimization_goal, billing_event, bid_strategy, bid_amount, dsa_beneficiary, dsa_payor, targeting, promoted_object, start_time, end_time, status, account_id, ...delivery }) => {
       try {
         const params: Record<string, unknown> = {
           name,
           campaign_id,
           optimization_goal,
           billing_event,
-          targeting,
+          targeting: parseJsonObject(targeting, "targeting"),
           status,
+          ...buildDeliveryOptions({ ...delivery, daily_budget, lifetime_budget, start_time, end_time }),
         };
         if (daily_budget) params.daily_budget = daily_budget;
         if (lifetime_budget) params.lifetime_budget = lifetime_budget;
         if (bid_strategy) params.bid_strategy = bid_strategy;
-        if (promoted_object) params.promoted_object = promoted_object;
+        if (bid_amount !== undefined) params.bid_amount = bid_amount;
+        if (dsa_beneficiary !== undefined) params.dsa_beneficiary = dsa_beneficiary;
+        if (dsa_payor !== undefined) params.dsa_payor = dsa_payor;
+        if (promoted_object !== undefined) params.promoted_object = parseJsonObject(promoted_object, "promoted_object");
         if (start_time) params.start_time = start_time;
         if (end_time) params.end_time = end_time;
         const { data, rateLimit } = await client.post(`${client.accountPath(account_id)}/adsets`, params);
-        return { content: [{ type: "text" as const, text: JSON.stringify({ ...data as object, _rateLimit: rateLimit }, null, 2) }] };
+        return { content: [{ type: "text" as const, text: JSON.stringify({ ...data as object, _rateLimit: rateLimit, ...(delivery.validate_only ? { _validationOnly: true } : {}) }, null, 2) }] };
       } catch (error) {
         return { content: [{ type: "text" as const, text: `Failed: ${error instanceof Error ? error.message : String(error)}` }], isError: true };
       }
@@ -108,20 +118,27 @@ export function registerAdsetTools(server: McpServer, client: AdsClient): void {
       start_time: z.string().optional().describe("New start time (ISO 8601)"),
       end_time: z.string().optional().describe("New end time (ISO 8601)"),
       bid_amount: z.string().optional().describe("New bid amount in currency cents"),
+      bid_strategy: z.string().optional().describe("New bid strategy"),
+      dsa_beneficiary: z.string().min(1).optional().describe("Beneficiary of EU-targeted ads"),
+      dsa_payor: z.string().min(1).optional().describe("Payer of EU-targeted ads; does not automatically copy the beneficiary"),
+      ...deliveryOptions,
     },
-    async ({ adset_id, name, status, daily_budget, lifetime_budget, targeting, start_time, end_time, bid_amount }) => {
+    async ({ adset_id, name, status, daily_budget, lifetime_budget, targeting, start_time, end_time, bid_amount, bid_strategy, dsa_beneficiary, dsa_payor, ...delivery }) => {
       try {
-        const params: Record<string, unknown> = {};
+        const params: Record<string, unknown> = buildDeliveryOptions({ ...delivery, daily_budget, lifetime_budget, start_time, end_time });
         if (name) params.name = name;
         if (status) params.status = status;
         if (daily_budget) params.daily_budget = daily_budget;
         if (lifetime_budget) params.lifetime_budget = lifetime_budget;
-        if (targeting) params.targeting = targeting;
+        if (targeting !== undefined) params.targeting = parseJsonObject(targeting, "targeting");
         if (start_time) params.start_time = start_time;
         if (end_time) params.end_time = end_time;
         if (bid_amount) params.bid_amount = bid_amount;
+        if (bid_strategy !== undefined) params.bid_strategy = bid_strategy;
+        if (dsa_beneficiary !== undefined) params.dsa_beneficiary = dsa_beneficiary;
+        if (dsa_payor !== undefined) params.dsa_payor = dsa_payor;
         const { data, rateLimit } = await client.post(`/${adset_id}`, params);
-        return { content: [{ type: "text" as const, text: JSON.stringify({ ...data as object, _rateLimit: rateLimit }, null, 2) }] };
+        return { content: [{ type: "text" as const, text: JSON.stringify({ ...data as object, _rateLimit: rateLimit, ...(delivery.validate_only ? { _validationOnly: true } : {}) }, null, 2) }] };
       } catch (error) {
         return { content: [{ type: "text" as const, text: `Failed: ${error instanceof Error ? error.message : String(error)}` }], isError: true };
       }

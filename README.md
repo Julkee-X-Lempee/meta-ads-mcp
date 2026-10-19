@@ -20,6 +20,16 @@ Use this MCP when you need to:
 - **"Set up automated rules to pause underperforming ads"** — use `create_rule` with conditions like CPA > threshold
 - **"Manage my product catalog for dynamic ads"** — use `create_catalog`, `create_feed`, and `upload_feed` to set up dynamic product ads
 
+## What's New in v1.6.0
+
+- `create_adset` accepts `bid_amount`; creation and updates accept `dsa_beneficiary` and `dsa_payor`. For EU-targeted ads, supply each required value or configure the corresponding account default. The payer does not automatically copy the beneficiary.
+- Ad and ad-set lists use campaign/ad-set edges when scoped. Combined campaign/ad-set filters and explicit account IDs are checked for consistency.
+- `create_adset` and `update_adset` accept `destination_type`, `attribution_spec`, `adset_schedule`, `pacing_type`, and `validate_only`. Existing calls still perform their requested writes; set `validate_only: true` to ask Meta to validate without mutation. A successful validation does not create an ad set.
+- Hourly schedules accept minute ranges and days (Sunday = 0); specify `timezone_type` as `USER` or `ADVERTISER`. Scheduling adds `day_parting` pacing. Meta validates effective lifetime budgeting, objective eligibility, and attribution restrictions. No budget or status is changed automatically.
+- `create_custom_audience` accepts a JSON `rule`, `pixel_id`, and `retention_days` for rule-based audiences. Audience creation is a real write, not a dry run.
+
+See the official [ad-set creation](https://developers.facebook.com/documentation/ads-commerce/marketing-api/reference/ad-account/adsets) and [ad-set update](https://developers.facebook.com/documentation/ads-commerce/marketing-api/reference/ad-campaign) contracts.
+
 ## What's New in v1.5.0
 
 - Conversion tools validate the existing `events` JSON input and send it as the required `data` array. Use `test_event_code` to verify receipt in Events Manager; offline events use a dataset ID and `action_source=physical_store` for store events.

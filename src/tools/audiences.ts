@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { AdsClient } from "../services/ads-client.js";
+import { parseJsonObject } from "../services/api-contracts.js";
 
 export function registerAudienceTools(server: McpServer, client: AdsClient): void {
   // ─── list_custom_audiences ─────────────────────────────────
@@ -70,13 +71,23 @@ export function registerAudienceTools(server: McpServer, client: AdsClient): voi
       ]).describe("Audience subtype"),
       description: z.string().optional().describe("Audience description"),
       customer_file_source: z.string().optional().describe("Source of customer file: USER_PROVIDED_ONLY, PARTNER_PROVIDED_ONLY, BOTH_USER_AND_PARTNER_PROVIDED"),
+      rule: z.string().optional().describe("JSON object defining website, video, or engagement audience rules. This creates an audience; validate-only is not supported."),
+      retention_days: z.number().int().positive().optional().describe("Retention period; allowed range depends on the audience source"),
+      pixel_id: z.string().optional().describe("Pixel ID for website audiences"),
       account_id: z.string().optional().describe("Ad account ID to create the audience in (e.g. 'act_123' or '123'). Falls back to META_AD_ACCOUNT_ID env var if omitted."),
     },
-    async ({ name, subtype, description, customer_file_source, account_id }) => {
+    async ({ name, subtype, description, customer_file_source, rule, retention_days, pixel_id, account_id }) => {
       try {
         const params: Record<string, unknown> = { name, subtype };
         if (description) params.description = description;
         if (customer_file_source) params.customer_file_source = customer_file_source;
+        if (rule !== undefined) {
+          const parsedRule = parseJsonObject(rule, "rule");
+          if (Object.keys(parsedRule).length === 0) throw new Error("rule must not be empty.");
+          params.rule = JSON.stringify(parsedRule);
+        }
+        if (retention_days !== undefined) params.retention_days = retention_days;
+        if (pixel_id !== undefined) params.pixel_id = pixel_id;
         const { data, rateLimit } = await client.post(`${client.accountPath(account_id)}/customaudiences`, params);
         return { content: [{ type: "text" as const, text: JSON.stringify({ ...data as object, _rateLimit: rateLimit }, null, 2) }] };
       } catch (error) {

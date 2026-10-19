@@ -32,7 +32,11 @@
 - META_BUSINESS_ID (optional): Business Manager ID for business tools
 - META_PIXEL_ID (optional): Pixel ID for conversion tools
 
-## Tools (123)
+## Tools (134)
+
+Ad-set launch options: create_adset supports bid_amount. Both create_adset and update_adset accept dsa_beneficiary/dsa_payor, destination_type, attribution_spec, adset_schedule, pacing_type, and validate_only. Set validate_only=true explicitly for non-mutating Meta validation; defaults preserve normal writes. Schedules require effective lifetime budgeting; Meta validates campaign/objective restrictions. No automatic budget or status conversion. USER is the API's default schedule timezone; use ADVERTISER explicitly for account-local hours. DSA payer and beneficiary use independent account defaults, not each other's values.
+
+create_custom_audience accepts rule (JSON object), pixel_id, and retention_days. It creates an audience; no validate-only guarantee is offered.
 
 ### Campaign Management (22)
 list_campaigns, get_campaign, create_campaign, update_campaign, delete_campaign, get_campaign_adsets, get_campaign_ads, get_campaign_leads, list_adsets, get_adset, create_adset, update_adset, delete_adset, get_adset_ads, get_adset_leads, list_ads, get_ad, create_ad, update_ad, delete_ad, get_ad_preview, get_delivery_estimate
