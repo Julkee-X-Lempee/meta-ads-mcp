@@ -38,6 +38,8 @@ See the official [ad-set creation](https://developers.facebook.com/documentation
 
 ## Installation
 
+Requires Node.js 20 or later, including the MCP host's `npx` environment.
+
 ```json
 {
   "mcpServers": {

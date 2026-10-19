@@ -6,12 +6,12 @@
     "url": "https://github.com/mikusnuz/meta-ads-mcp",
     "source": "github"
   },
-  "version": "1.6.0",
+  "version": "1.6.1",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@mikusnuz/meta-ads-mcp",
-      "version": "1.6.0",
+      "version": "1.6.1",
       "transport": {
         "type": "stdio"
       },
