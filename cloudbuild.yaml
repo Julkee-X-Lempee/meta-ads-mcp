@@ -1,0 +1,27 @@
+# Builds and deploys the meta-ads-mcp Cloud Run service in dice-hub (Julkee-X-Lempee fork).
+# Run by the manual Cloud Build trigger "meta-ads-mcp-main" (branch dice - the deployed code;
+# master mirrors upstream mikusnuz/meta-ads-mcp).
+# Only the image changes on deploy: env vars, the Meta secrets and the service account stay as
+# configured by dice-infra (_modules/dice-hub/meta_ads_mcp.tf). Images are tagged with the commit
+# SHA so a bad build can be rolled back by deploying the previous tag.
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build',
+           '-t', 'europe-west4-docker.pkg.dev/$PROJECT_ID/meta-ads-mcp/meta-ads-mcp:$SHORT_SHA',
+           '-t', 'europe-west4-docker.pkg.dev/$PROJECT_ID/meta-ads-mcp/meta-ads-mcp:latest',
+           '.']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', '--all-tags', 'europe-west4-docker.pkg.dev/$PROJECT_ID/meta-ads-mcp/meta-ads-mcp']
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args: ['run', 'deploy', 'meta-ads-mcp',
+           '--image', 'europe-west4-docker.pkg.dev/$PROJECT_ID/meta-ads-mcp/meta-ads-mcp:$SHORT_SHA',
+           '--region', 'europe-west4']
+
+images:
+  - 'europe-west4-docker.pkg.dev/$PROJECT_ID/meta-ads-mcp/meta-ads-mcp:$SHORT_SHA'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
