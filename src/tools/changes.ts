@@ -2,7 +2,9 @@
 //
 // Write tools: a small, fixed set of changes to Meta ad accounts, each with guardrails enforced
 // here in the server so they hold no matter which client calls the tool. Same rules as the
-// changes_* tools in Dice's google-ads-mcp fork:
+// changes_* tools in Dice's google-ads-mcp fork. Named changes_meta_* because the Orchestrator's
+// Panostaja chat offers both servers' tools to one model, which needs unique names (Google Ads
+// already has changes_set_status); the changes_ prefix is what makes the chat apply on approval.
 //
 // - Every tool is a dry run unless called with validate_only=false. A dry run sends the change
 //   to Meta with execution_options=["validate_only"], so Meta checks it fully but applies nothing.
@@ -85,9 +87,9 @@ const validateOnlyArg = z.boolean().optional().default(true)
   .describe("true (default) = Meta checks the change but nothing is applied. false = apply it.");
 
 export function registerChangeTools(server: McpServer, client: AdsClient): void {
-  // ─── changes_update_budget ─────────────────────────────────
+  // ─── changes_meta_update_budget ─────────────────────────────────
   server.tool(
-    "changes_update_budget",
+    "changes_meta_update_budget",
     "Sets the daily budget of a campaign (campaign budget / CBO) or an ad set, in the account's currency " +
       "(e.g. 45.0 = 45 EUR/day). Dry run unless validate_only is false. Refused if the change is bigger than " +
       "the per-change limit (default 30%), if the object uses a lifetime budget, or if the budget lives on the " +
@@ -123,9 +125,9 @@ export function registerChangeTools(server: McpServer, client: AdsClient): void 
     }
   );
 
-  // ─── changes_set_status ────────────────────────────────────
+  // ─── changes_meta_set_status ────────────────────────────────────
   server.tool(
-    "changes_set_status",
+    "changes_meta_set_status",
     "Pauses or activates a campaign, ad set or ad. Never deletes or archives anything. Dry run unless validate_only is false.",
     {
       level: z.enum(["campaign", "adset", "ad"]).describe("campaign, adset or ad"),
@@ -150,9 +152,9 @@ export function registerChangeTools(server: McpServer, client: AdsClient): void 
     }
   );
 
-  // ─── changes_update_bid ────────────────────────────────────
+  // ─── changes_meta_update_bid ────────────────────────────────────
   server.tool(
-    "changes_update_bid",
+    "changes_meta_update_bid",
     "Sets an ad set's bid amount (its bid cap or cost cap), in the account's currency. Only for ad sets that " +
       "already use LOWEST_COST_WITH_BID_CAP or COST_CAP with an amount set; the bid strategy is never switched. " +
       "Dry run unless validate_only is false. Refused if the change is bigger than the per-change limit (default 30%).",
