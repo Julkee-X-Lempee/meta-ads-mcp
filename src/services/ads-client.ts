@@ -233,6 +233,22 @@ export class AdsClient {
     return this.config.adAccountId;
   }
 
+  /** The account the changes_* tools may touch: the session's X-Meta-Ad-Account-Id header, or
+   * META_AD_ACCOUNT_ID. Never an account picked with select_ad_account. (Dice addition.) */
+  get pinnedAccountId(): string {
+    let pinned: string | undefined;
+    try {
+      pinned = requestStorage.getStore()?.get("pinnedAdAccountId");
+    } catch (e) {
+      // Ignore error if storage is accessed outside request context
+    }
+    const id = (pinned || this.config.adAccountId || "").replace(/^act_/, "");
+    if (!id) {
+      throw new Error("Refused: no ad account is pinned for this session (X-Meta-Ad-Account-Id header).");
+    }
+    return id;
+  }
+
   get pixelId(): string {
     if (!this.config.pixelId) {
       throw new Error(

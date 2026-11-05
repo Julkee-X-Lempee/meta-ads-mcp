@@ -36,6 +36,7 @@ import { registerAccountTools } from "./tools/account.js";
 import { registerBusinessTools } from "./tools/business.js";
 import { registerAuthTools } from "./tools/auth.js";
 import { registerAdLibraryTools } from "./tools/ad_library.js";
+import { registerChangeTools } from "./tools/changes.js";
 
 // --- Resources & Prompts ---
 import { registerResources } from "./resources/account.js";
@@ -97,6 +98,9 @@ function registerAllTools(s: McpServer) {
   // --- Ad Library ---
   registerAdLibraryTools(s, client);
 
+  // --- Guarded changes (Dice addition) ---
+  registerChangeTools(s, client);
+
   // --- Resources & Prompts ---
   registerResources(s, client);
   registerPrompts(s);
@@ -104,7 +108,7 @@ function registerAllTools(s: McpServer) {
   // --- Session Account Switching ---
   s.tool(
     "select_ad_account",
-    "Select and switch the active Meta ad account for all subsequent operations in this session. Use this to query another client's ad account.",
+    "Select and switch the active Meta ad account for all subsequent operations in this session. Use this to query another client's ad account. Refused when the session's account is pinned with the X-Meta-Ad-Account-Id header.",
     {
       ad_account_id: z.string().describe("The Meta ad account ID to switch to (e.g. 'act_12345' or '12345')"),
     },
@@ -114,6 +118,10 @@ function registerAllTools(s: McpServer) {
         return { content: [{ type: "text" as const, text: "Error: No session storage active." }], isError: true };
       }
       const normalizedId = ad_account_id.replace(/^act_/, "");
+      const pinned = store.get("pinnedAdAccountId");
+      if (pinned && pinned !== normalizedId) {
+        return { content: [{ type: "text" as const, text: `Refused: this session is pinned to act_${pinned}.` }], isError: true };
+      }
       store.set("adAccountId", normalizedId);
       console.log(`[select_ad_account] Switched active session adAccountId to: act_${normalizedId}`);
       return { content: [{ type: "text" as const, text: `Successfully switched active ad account to act_${normalizedId}` }] };
@@ -143,7 +151,10 @@ async function main() {
       
       // Store reference context in the transport session object
       const transportStore = new Map<string, string>();
-      if (adAccountId) transportStore.set("adAccountId", adAccountId);
+      if (adAccountId) {
+        transportStore.set("adAccountId", adAccountId);
+        transportStore.set("pinnedAdAccountId", adAccountId.replace(/^act_/, ""));
+      }
       (transport as any)._store = transportStore;
 
       transports.set(transport.sessionId, transport);
@@ -186,6 +197,7 @@ async function main() {
       const adAccountId = req.headers["x-meta-ad-account-id"] as string;
       if (adAccountId && !store.has("adAccountId")) {
         store.set("adAccountId", adAccountId);
+        store.set("pinnedAdAccountId", adAccountId.replace(/^act_/, ""));
       }
 
       requestStorage.run(store, async () => {
@@ -259,6 +271,7 @@ export function createSandboxServer() {
   registerBusinessTools(sandbox, mockClient);
   registerAuthTools(sandbox, mockClient);
   registerAdLibraryTools(sandbox, mockClient);
+  registerChangeTools(sandbox, mockClient);
   registerResources(sandbox, mockClient);
   registerPrompts(sandbox);
 

@@ -71,18 +71,27 @@ export function registerAccountTools(server: McpServer, client: AdsClient): void
   // ─── get_account_activities ───────────────────────────────────
   server.tool(
     "get_account_activities",
-    "Get activity log for the ad account. Shows changes made to campaigns, ad sets, ads, etc.",
+    "Get activity log for the ad account. Shows changes made to campaigns, ad sets, ads, etc. Useful fields: actor_id, actor_name, application_id, application_name, event_type, event_time, object_id, object_type, extra_data.",
     {
       fields: z.string().optional().describe("Comma-separated fields to return"),
       limit: z.number().optional().default(25).describe("Number of results (default 25)"),
       after: z.string().optional().describe("Pagination cursor for next page"),
+      since: z.string().optional().describe("Only activities after this time (UNIX timestamp or YYYY-MM-DD)"),
+      until: z.string().optional().describe("Only activities before this time (UNIX timestamp or YYYY-MM-DD)"),
+      oid: z.string().optional().describe("Only activities on this object ID (campaign, ad set or ad)"),
+      category: z.string().optional().describe("Only this category, e.g. BUDGET, STATUS, BID, TARGETING, AD"),
     },
-    async ({ fields, limit, after }) => {
+    async ({ fields, limit, after, since, until, oid, category }) => {
       try {
         const params: Record<string, unknown> = {};
         if (fields) params.fields = fields;
         if (limit) params.limit = limit;
         if (after) params.after = after;
+        // Dice addition: filters, so a change history can be read without paging through everything.
+        if (since) params.since = since;
+        if (until) params.until = until;
+        if (oid) params.oid = oid;
+        if (category) params.category = category;
         const { data, rateLimit } = await client.get(`${client.accountPath}/activities`, params);
         return { content: [{ type: "text" as const, text: JSON.stringify({ ...data as object, _rateLimit: rateLimit }, null, 2) }] };
       } catch (error) {
