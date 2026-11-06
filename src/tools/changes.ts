@@ -8,8 +8,10 @@
 //
 // - Every tool is a dry run unless called with validate_only=false. A dry run sends the change
 //   to Meta with execution_options=["validate_only"], so Meta checks it fully but applies nothing.
-// - Budget and bid changes are capped at META_ADS_MCP_MAX_CHANGE_PCT (default 30) percent per
-//   call, up or down, and refused when the current value isn't set.
+// - Guardrail, on unless the caller passes guardrails=false (the autopilot never does; Dice's
+//   operator chat does, since a person approves every change there): budget and bid changes are
+//   capped at META_ADS_MCP_MAX_CHANGE_PCT (default 30) percent per call, up or down, and refused
+//   when the current value isn't set.
 // - Nothing is ever deleted or archived; statuses can only be ACTIVE or PAUSED.
 // - Only daily budgets are changed, and only where the budget lives: on the campaign when it uses
 //   campaign budget (CBO), on the ad set otherwise. Lifetime budgets are refused.
@@ -36,14 +38,15 @@ function maxChangePct(): number {
   return Number.isFinite(value) && value > 0 ? value : 30;
 }
 
-function checkChange(before: number, after: number, what: string): number {
+function checkChange(before: number, after: number, what: string, guardrails = true): number | null {
   if (!(after > 0)) throw new Refused(`Refused: ${what} must be greater than zero.`);
   if (!(before > 0)) {
+    if (!guardrails) return null;
     throw new Refused(`Refused: the current ${what} is not set, so the change can't be limited. Change it in Meta Ads Manager directly.`);
   }
   const pct = ((after - before) / before) * 100;
   // rounded: 30.00 -> 39.00 is +30 % exactly, not 30.0000000000004 %
-  if (Math.round(Math.abs(pct) * 1e6) / 1e6 > maxChangePct()) {
+  if (guardrails && Math.round(Math.abs(pct) * 1e6) / 1e6 > maxChangePct()) {
     throw new Refused(
       `Refused: ${what} change of ${pct >= 0 ? "+" : ""}${pct.toFixed(1)}% exceeds the ${maxChangePct()}% limit per change ` +
       `(${before} -> ${after}). Make smaller steps.`
@@ -85,6 +88,8 @@ async function write(client: AdsClient, id: string, params: Record<string, unkno
 
 const validateOnlyArg = z.boolean().optional().default(true)
   .describe("true (default) = Meta checks the change but nothing is applied. false = apply it.");
+const guardrailsArg = z.boolean().optional().default(true)
+  .describe("true (default) = Dice's safety limits apply. Leave as is.");
 
 export function registerChangeTools(server: McpServer, client: AdsClient): void {
   // ─── changes_meta_update_budget ─────────────────────────────────
@@ -99,8 +104,9 @@ export function registerChangeTools(server: McpServer, client: AdsClient): void 
       object_id: z.string().describe("Campaign or ad set ID"),
       new_daily_budget: z.number().describe("New daily budget in account currency, e.g. 45.0"),
       validate_only: validateOnlyArg,
+      guardrails: guardrailsArg,
     },
-    async ({ level, object_id, new_daily_budget, validate_only }) => {
+    async ({ level, object_id, new_daily_budget, validate_only, guardrails }) => {
       try {
         const row = await readOwned(client, object_id, level === "adset" ? "name,daily_budget,lifetime_budget,campaign_id" : "name,daily_budget,lifetime_budget");
         if (Number(row.lifetime_budget || 0) > 0) {
@@ -113,7 +119,7 @@ export function registerChangeTools(server: McpServer, client: AdsClient): void 
         }
         const { currency, factor } = await minorUnits(client);
         const before = Number(row.daily_budget) / factor;
-        const pct = checkChange(before, new_daily_budget, "daily budget");
+        const pct = checkChange(before, new_daily_budget, "daily budget", guardrails);
         await write(client, object_id, { daily_budget: String(Math.round(new_daily_budget * factor)) }, validate_only);
         return ok(validate_only, {
           level, object_id, name: row.name, currency,
@@ -137,13 +143,14 @@ export function registerChangeTools(server: McpServer, client: AdsClient): void 
     },
     async ({ level, object_id, status, validate_only }) => {
       try {
-        const row = await readOwned(client, object_id, "name,status,effective_status");
+        // Campaigns have no campaign_id field; ad sets and ads report theirs (follow-ups measure the campaign).
+        const row = await readOwned(client, object_id, level === "campaign" ? "name,status,effective_status" : "name,status,effective_status,campaign_id");
         if (row.status === "DELETED" || row.status === "ARCHIVED") {
           throw new Refused(`Refused: this ${level} is ${row.status}; it can't be changed here.`);
         }
         await write(client, object_id, { status }, validate_only);
         return ok(validate_only, {
-          level, object_id, name: row.name,
+          level, object_id, name: row.name, campaign_id: level === "campaign" ? object_id : row.campaign_id,
           status_before: row.status, status_after: status, effective_status_before: row.effective_status,
         });
       } catch (error) {
@@ -162,8 +169,9 @@ export function registerChangeTools(server: McpServer, client: AdsClient): void 
       adset_id: z.string().describe("Ad set ID"),
       new_bid_amount: z.number().describe("New bid amount in account currency, e.g. 12.5"),
       validate_only: validateOnlyArg,
+      guardrails: guardrailsArg,
     },
-    async ({ adset_id, new_bid_amount, validate_only }) => {
+    async ({ adset_id, new_bid_amount, validate_only, guardrails }) => {
       try {
         const row = await readOwned(client, adset_id, "name,bid_strategy,bid_amount,campaign{bid_strategy}");
         // Under campaign budget the strategy is set on the campaign; the amount still lives on the ad set.
@@ -173,7 +181,7 @@ export function registerChangeTools(server: McpServer, client: AdsClient): void 
         }
         const { currency, factor } = await minorUnits(client);
         const before = Number(row.bid_amount || 0) / factor;
-        const pct = checkChange(before, new_bid_amount, "bid amount");
+        const pct = checkChange(before, new_bid_amount, "bid amount", guardrails);
         await write(client, adset_id, { bid_amount: String(Math.round(new_bid_amount * factor)) }, validate_only);
         return ok(validate_only, {
           adset_id, name: row.name, currency, bid_strategy: strategy,
