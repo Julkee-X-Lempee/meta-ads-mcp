@@ -10,6 +10,9 @@ const insightParams = {
   time_increment: z.string().optional().describe("Time granularity: all_days, 1, 7, monthly"),
   filtering: z.string().optional().describe("JSON string for filtering"),
   level: z.string().optional().describe("Aggregation level: campaign, adset, ad"),
+  // Dice addition: Meta returns 25 rows a page, so per-ad-set / per-ad rows of a bigger account need paging.
+  limit: z.number().optional().describe("Rows per page (Meta's default is 25)"),
+  after: z.string().optional().describe("Pagination cursor for the next page"),
 };
 
 export function registerInsightTools(server: McpServer, client: AdsClient): void {
